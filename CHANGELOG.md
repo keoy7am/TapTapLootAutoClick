@@ -11,6 +11,23 @@
 
 ---
 
+## [1.0.1] - 2026-04-18
+
+### Fixed
+- **熱鍵觸發 tray 更新時崩潰**（`OSError: WinError 1402` 無效的游標控制代碼）
+  - 加入 `threading.Lock` 序列化跨執行緒的 tray 更新
+  - 容錯 pystray 的 `DestroyIcon` GDI race（記 debug log 並繼續執行）
+  - 跳過相同 status 的無謂圖示交換，減少 GDI churn
+- **熱鍵 callback 例外殺掉 keyboard thread**
+  - 所有熱鍵 handler 包 try/except，個別失敗不影響其他熱鍵
+
+### Build
+- `build.bat` 改用 `set /p VER=<VERSION` 讀取版本（修復先前 `for /f` + python 單行的跨層 escape 問題）
+- `_make_version_info.py` 同步生成 `VERSION` 純文字檔
+- `.gitignore` 新增 `VERSION`
+
+---
+
 ## [1.0.0] - 2026-04-18
 
 ### Added

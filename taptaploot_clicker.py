@@ -17,7 +17,7 @@ Hotkeys:
 from __future__ import annotations
 
 # === Version (single source of truth) ===
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "TapTapLoot Auto Clicker contributors"
 __url__ = "https://github.com/keoy7am/TapTapLootAutoClick"
 __license__ = "MIT"
@@ -553,6 +553,11 @@ class TrayController:
     def __init__(self, state: State):
         self.state = state
         self.icon: pystray.Icon | None = None
+        # Serialize tray updates across threads (hotkey thread, click loop, watchdog)
+        # to avoid pystray's WinError 1402 (DestroyIcon race on cross-thread GDI access)
+        self._update_lock = threading.Lock()
+        self._last_pushed_status: str = ""
+        self._last_pushed_tooltip: str = ""
 
     def build_menu(self) -> pystray.Menu:
         s = self.state
@@ -612,18 +617,41 @@ class TrayController:
         if not self.icon:
             return
         s = self.state
-        self.state.last_status = status
+        s.last_status = status
         mode_label = "前景" if s.mode == "foreground" else "背景"
         tooltip = (
             f"TapTapLoot Clicker v{__version__} - {STATUS_LABELS.get(status, status)} "
             f"[{mode_label}模式] CPS={int(s.cps)}"
         )
-        self.icon.icon = ICONS.get(status, ICONS["paused"])
-        self.icon.title = tooltip
-        try:
-            self.icon.update_menu()
-        except Exception:
-            pass
+
+        # Serialize cross-thread updates to avoid pystray DestroyIcon race
+        with self._update_lock:
+            new_icon = ICONS.get(status, ICONS["paused"])
+
+            # Skip icon swap if unchanged (avoids unnecessary GDI churn that
+            # can trigger WinError 1402 under thread races)
+            if status != self._last_pushed_status:
+                try:
+                    self.icon.icon = new_icon
+                    self._last_pushed_status = status
+                except OSError as e:
+                    # WinError 1402: invalid cursor/icon handle - benign GDI race.
+                    # The icon may not visually update this round; next call will succeed.
+                    logging.debug(f"tray icon swap OSError (benign, will retry): {e}")
+                except Exception as e:
+                    logging.exception(f"tray icon swap failed: {e}")
+
+            if tooltip != self._last_pushed_tooltip:
+                try:
+                    self.icon.title = tooltip
+                    self._last_pushed_tooltip = tooltip
+                except Exception as e:
+                    logging.debug(f"tray title set failed: {e}")
+
+            try:
+                self.icon.update_menu()
+            except Exception:
+                pass
 
     # --- menu callbacks ---
 
@@ -714,6 +742,15 @@ class TrayController:
 def setup_hotkeys(state: State, tray: TrayController) -> None:
     cfg = state.cfg
 
+    def _safe(fn):
+        """Wrap hotkey callbacks so an exception never kills the keyboard thread."""
+        def wrapper():
+            try:
+                fn()
+            except Exception as e:
+                logging.exception(f"hotkey handler crashed: {e}")
+        return wrapper
+
     def _toggle():
         tray.on_toggle(None, None)
 
@@ -727,9 +764,9 @@ def setup_hotkeys(state: State, tray: TrayController) -> None:
         tray.on_quit(None, None)
 
     try:
-        keyboard.add_hotkey(cfg.hk_toggle, _toggle)
-        keyboard.add_hotkey(cfg.hk_switch_mode, _switch_mode)
-        keyboard.add_hotkey(cfg.hk_quit, _quit)
+        keyboard.add_hotkey(cfg.hk_toggle, _safe(_toggle))
+        keyboard.add_hotkey(cfg.hk_switch_mode, _safe(_switch_mode))
+        keyboard.add_hotkey(cfg.hk_quit, _safe(_quit))
         logging.info(f"熱鍵已註冊：{cfg.hk_toggle}=toggle, {cfg.hk_switch_mode}=mode, {cfg.hk_quit}=quit")
     except Exception as e:
         logging.exception(f"熱鍵註冊失敗：{e}")
