@@ -1,0 +1,40 @@
+[clicker]
+# TapTapLoot 視窗識別
+# 優先順序：process_name > title > class
+# 設為空字串 "" 表示不使用該條件
+target_process_name = "TapTapLoot.exe"
+target_window_title = "TapTapLoot"
+target_window_class = "UnityWndClass"
+
+# 點擊速率（每秒次數）。10 為自然手速，建議不超過 20，遊戲本身透過滑鼠點擊過快也不會都進行響應。
+cps = 10
+
+# 隨機抖動（0.0 ~ 0.5），加入間隔的隨機性以模擬人類
+jitter = 0.15
+
+# 啟動模式："foreground" 或 "background"
+mode = "foreground"
+
+# 點擊位置：相對於視窗中心的偏移（像素）
+click_offset_x = 0
+click_offset_y = 0
+
+# 按下與放開之間的延遲（毫秒）
+# Unity 逐 frame 輪詢輸入，太快的 down+up 可能被漏掉。建議 20~50ms
+# 30ms 為經測試可運作的參數，過快可能導致點擊無效，過慢則降低效率。
+hold_ms = 30
+
+# 啟動時是否自動開始點擊（false = 等待 F6 啟動）
+autostart = false
+
+[hotkeys]
+toggle = "F6"
+switch_mode = "F7"
+quit = "F8"
+
+[safety]
+# 競技遊戲偵測掃描間隔（秒）
+scan_interval = 1.0
+
+# 偵測到競技遊戲時的行為："exit"（強制退出）或 "pause"（僅暫停）
+on_competitive_detected = "exit"
