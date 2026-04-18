@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 SRC = ROOT / "taptaploot_clicker.py"
 OUT = ROOT / "version_info.txt"
+VERSION_FILE = ROOT / "VERSION"
 
 
 def parse_version() -> tuple[str, tuple[int, int, int, int]]:
@@ -71,7 +72,9 @@ VSVersionInfo(
 def main() -> None:
     ver_str, ver_tuple = parse_version()
     OUT.write_text(TEMPLATE.format(tup=ver_tuple, ver=ver_str), encoding="utf-8")
-    print(f"已生成 {OUT.name}: v{ver_str} {ver_tuple}")
+    # 同步寫一個純文字 VERSION 檔給 build.bat 讀（避免 for /f + python 單行的跨層 escape 問題）
+    VERSION_FILE.write_text(ver_str, encoding="ascii")
+    print(f"已生成 {OUT.name} 與 {VERSION_FILE.name}: v{ver_str} {ver_tuple}")
 
 
 if __name__ == "__main__":

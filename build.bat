@@ -45,8 +45,16 @@ if errorlevel 1 goto :error
 
 echo.
 echo [5/5] Tagging output with version...
-for /f "delims=" %%V in ('python -c "import re; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', open('taptaploot_clicker.py', encoding='utf-8').read()).group(1))"') do set VER=%%V
+set /p VER=<VERSION
+if "%VER%"=="" (
+    echo [ERROR] 無法讀取 VERSION 檔
+    goto :error
+)
 copy /Y "dist\TapTapLootClicker.exe" "dist\TapTapLootClicker-v%VER%.exe" >nul
+if errorlevel 1 (
+    echo [ERROR] 版本化複製失敗
+    goto :error
+)
 
 echo.
 echo ========================================
